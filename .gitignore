@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+build/
+dist/
+
+# Data — Sherpa data files MUST live in a separate repo per spec D8.
+# These guards exist in case anyone accidentally creates them inside this repo.
+*.sqlite
+*.sqlite-*
+*.db
+data/
+.sherpa/
+
+# Salt file (operator-only, 0400 in operator $HOME). Never check in.
+sherpa-salt
+sherpa-salt.txt
+*.salt
+
+# RAG index artifacts (also belong in a separate repo per spec D8).
+rag_index/
+*.index
+*.npy
+
+# Local logs / audit
+logs/
+audit/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

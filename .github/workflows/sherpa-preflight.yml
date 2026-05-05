@@ -1,0 +1,53 @@
+name: sherpa-preflight
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# Spec pre-flight-bot: must run on the operator's self-hosted runner only.
+# The job below fails fast if it ever lands on a hosted runner.
+jobs:
+  preflight:
+    runs-on: [self-hosted, sherpa-local]
+    timeout-minutes: 20
+    permissions:
+      pull-requests: write
+      contents: read
+    env:
+      SHERPA_GH_TOKEN: ${{ secrets.SHERPA_BOT_TOKEN }}
+      SHERPA_SALT_PATH: ${{ secrets.SHERPA_SALT_PATH }}
+      SHERPA_DB_PATH: ${{ vars.SHERPA_DB_PATH }}
+      SHERPA_RAG_DIR: ${{ vars.SHERPA_RAG_DIR }}
+      SHERPA_AUDIT_DIR: ${{ vars.SHERPA_AUDIT_DIR }}
+      SHERPA_STATE_PATH: ${{ vars.SHERPA_STATE_PATH }}
+      SHERPA_SENIORS_PATH: ${{ vars.SHERPA_SENIORS_PATH }}
+      SHERPA_BOTS_PATH: ${{ vars.SHERPA_BOTS_PATH }}
+      SHERPA_SKILL_MD: ${{ vars.SHERPA_SKILL_MD }}
+      SHERPA_LLM_MODEL: ${{ vars.SHERPA_LLM_MODEL }}
+      SHERPA_EMBED_MODEL: ${{ vars.SHERPA_EMBED_MODEL }}
+      OLLAMA_BASE_URL: ${{ vars.OLLAMA_BASE_URL }}
+    steps:
+      - name: Refuse hosted-runner execution
+        run: |
+          # GitHub-hosted runners always set RUNNER_ENVIRONMENT=github-hosted.
+          if [ "${RUNNER_ENVIRONMENT:-}" = "github-hosted" ]; then
+            echo "::error::Sherpa MUST NOT run on a hosted runner — IP-protection invariant."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run inference (writes body to file)
+        run: |
+          set -euo pipefail
+          mkdir -p .sherpa-run
+          python -m sherpa.inference run \
+              --pr "${{ github.event.pull_request.node_id }}" \
+              > .sherpa-run/body.txt
+
+      - name: Post pre-flight comment
+        run: |
+          python -m sherpa.bot post \
+              --pr "${{ github.repository }}#${{ github.event.pull_request.number }}" \
+              --body-file .sherpa-run/body.txt
