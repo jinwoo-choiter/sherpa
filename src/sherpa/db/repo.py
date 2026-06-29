@@ -5,6 +5,7 @@ Spec §4 schema. UPSERTs on primary keys make ingestion idempotent.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -17,6 +18,7 @@ SCHEMA_PATH = files("sherpa.db").joinpath("schema.sql")
 
 VALID_RESOLUTIONS = {"addressed", "discussed", "dismissed", "ignored"}
 VALID_ROLES = {"senior", "peer", "bot"}
+VALID_KNOWLEDGE_STATUS = {"candidate", "active", "rejected"}
 
 
 @contextmanager
@@ -205,6 +207,58 @@ def fetch_pr_diffs(conn: sqlite3.Connection, pr_id: str) -> list[sqlite3.Row]:
         "SELECT * FROM code_diffs WHERE pr_id = ?",
         (pr_id,),
     ))
+
+
+def fetch_diff_by_id(conn: sqlite3.Connection, diff_id: str) -> sqlite3.Row | None:
+    return conn.execute("SELECT * FROM code_diffs WHERE id = ?", (diff_id,)).fetchone()
+
+
+# ---- knowledge-capture store ----
+
+def insert_knowledge_candidate(
+    conn: sqlite3.Connection,
+    *,
+    entry_id: str,
+    body: str,
+    source_comment_ids: list[str],
+    diff_excerpt: str,
+    created_at: datetime | str,
+) -> bool:
+    """Insert a candidate iff absent. Returns True if a new row was created.
+
+    Existing entries (incl. confirmed/rejected) are left untouched, so re-running
+    distillation never clobbers a curation decision.
+    """
+    cur = conn.execute(
+        """
+        INSERT INTO knowledge_entries (id, status, body, source_comment_ids,
+                                       diff_excerpt, created_at)
+        VALUES (?, 'candidate', ?, ?, ?, ?)
+        ON CONFLICT(id) DO NOTHING
+        """,
+        (entry_id, body, json.dumps(source_comment_ids), diff_excerpt, _iso(created_at)),
+    )
+    return cur.rowcount > 0
+
+
+def set_knowledge_status(conn: sqlite3.Connection, *, entry_id: str, status: str) -> None:
+    if status not in VALID_KNOWLEDGE_STATUS:
+        raise ValueError(f"invalid knowledge status: {status}")
+    conn.execute(
+        "UPDATE knowledge_entries SET status = ? WHERE id = ?",
+        (status, entry_id),
+    )
+
+
+def fetch_knowledge(conn: sqlite3.Connection, status: str | None = None) -> list[sqlite3.Row]:
+    if status is not None:
+        if status not in VALID_KNOWLEDGE_STATUS:
+            raise ValueError(f"invalid knowledge status: {status}")
+        return list(conn.execute(
+            "SELECT * FROM knowledge_entries WHERE status = ? ORDER BY created_at",
+            (status,),
+        ))
+    return list(conn.execute("SELECT * FROM knowledge_entries ORDER BY created_at"))
 
 
 def fetch_addressed_senior_comments(conn: sqlite3.Connection) -> list[sqlite3.Row]:

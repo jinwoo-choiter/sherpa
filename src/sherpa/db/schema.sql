@@ -60,3 +60,17 @@ CREATE TABLE IF NOT EXISTS learning_labels (
     labeled_at      TIMESTAMP NOT NULL,
     weekly_pr_url   TEXT
 );
+
+-- Tacit-knowledge store (capability knowledge-capture). Separate from the spec
+-- layer; provenance is comment ids only — never a plaintext login (D5/D10).
+CREATE TABLE IF NOT EXISTS knowledge_entries (
+    id                 TEXT PRIMARY KEY,            -- stable hash of source comment ids
+    status             TEXT NOT NULL DEFAULT 'candidate'
+        CHECK (status IN ('candidate', 'active', 'rejected')),
+    body               TEXT NOT NULL,
+    source_comment_ids TEXT NOT NULL,               -- JSON array of comment ids (provenance)
+    diff_excerpt       TEXT NOT NULL DEFAULT '',
+    created_at         TIMESTAMP NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_knowledge_status ON knowledge_entries(status);
