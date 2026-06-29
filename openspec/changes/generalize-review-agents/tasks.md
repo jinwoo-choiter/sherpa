@@ -1,28 +1,28 @@
 ## 1. 에이전트 추상화 (`ReviewAgent` 계약)
 
-- [ ] 1.1 `ReviewResult` 스키마 정의 (요약/인라인 findings{file,line,severity,body}/category evidence/open questions) — 직렬화·검증 가능
-- [ ] 1.2 `ReviewTask` 정의 (repo checkout·PR 메타·주입 지식·form_spec·출력 스키마)
-- [ ] 1.3 `ReviewAgent` 계약 + `AgentAdapter` 인터페이스(build_invocation→run→parse→extract_trajectory) 작성
-- [ ] 1.4 Claude 어댑터 작성 (비대화형 실행, 우리 스키마로 출력 coax + 파싱)
-- [ ] 1.5 Codex 어댑터 작성 (동일 계약)
-- [ ] 1.6 레거시 Ollama 어댑터 — 기존 `inference/llm.py` `_assert_local` 가드 보존한 채 계약에 맞춤
-- [ ] 1.7 config 기본 에이전트 + per-run override(`--agent`) 선택 로직 — **DoD: `--agent` 미지정 시 기본, 지정 시 해당 에이전트 사용**
+- [x] 1.1 `ReviewResult` 스키마 정의 (요약/인라인 findings{file,line,severity,body}/category evidence/open questions) — 직렬화·검증 가능
+- [x] 1.2 `ReviewTask` 정의 (repo checkout·PR 메타·주입 지식·form_spec·출력 스키마)
+- [x] 1.3 `ReviewAgent` 계약 + `AgentAdapter` 인터페이스(build_invocation→run→parse→extract_trajectory) 작성
+- [x] 1.4 Claude 어댑터 작성 (비대화형 실행, 우리 스키마로 출력 coax + 파싱) _(live CLI 미검증; argv/파싱 단위테스트)_
+- [x] 1.5 Codex 어댑터 작성 (동일 계약) _(live CLI 미검증)_
+- [x] 1.6 레거시 Ollama 어댑터 — 기존 `inference/llm.py` `_assert_local` 가드 보존한 채 계약에 맞춤
+- [x] 1.7 config 기본 에이전트(`SHERPA_REVIEW_AGENT`) + per-run override 선택 로직(`agent.resolve`) — **DoD: 미지정 시 기본, 지정 시 해당 에이전트** _(CLI `--agent` 플래그는 4.6)_
 
 ## 2. 샌드박스 실행 + trajectory 감사
 
-- [ ] 2.1 샌드박스 읽기전용 실행(파일 변경·git push·모델 API 외 네트워크 차단) 어댑터 공통 적용
-- [ ] 2.2 차단된 mutating 시도를 trajectory에 기록
-- [ ] 2.3 기존 `inference/audit.write()`를 trajectory로 확장 ({agent/model 버전, 읽은 파일, 실행 명령, 원본 transcript 참조} 추가)
-- [ ] 2.4 어댑터별 세션 transcript → 정규화 trajectory 추출 (claude/codex 포맷)
+- [x] 2.1 샌드박스 읽기전용 실행(파일 변경·git push·모델 API 외 네트워크 차단) 어댑터 공통 적용 (`agent/sandbox.py` 정책 + 어댑터 플래그)
+- [ ] 2.2 차단된 mutating 시도를 trajectory에 기록 _(미완: Trajectory.blocked_attempts 필드·audit 직렬화는 존재, 어댑터 추출은 live stream 포맷 필요)_
+- [x] 2.3 기존 `inference/audit.write()`를 trajectory로 확장 ({agent/model 버전, 읽은 파일, 실행 명령, 원본 transcript 참조} 추가)
+- [ ] 2.4 어댑터별 세션 transcript → 정규화 trajectory 추출 (claude/codex 포맷) _(미완: claude는 model/session 기본 추출, files_read·commands_run 풍부 추출은 stream-json 검증 필요)_
 
 ## 3. 암묵지 포착 (`knowledge/`)
 
-- [ ] 3.1 암묵지 저장소 모듈 — spec과 분리, 평문 login 미저장(provenance는 comment id/`author_hash`)
-- [ ] 3.2 `comment_outcomes` good-cases-only(시니어+addressed+merged)에서 후보 distill 로직 — `outcomes/` 재사용
-- [ ] 3.3 사람 큐레이션 게이트: 후보→active 확정/거부 CLI, active만 주입 대상
-- [ ] 3.4 현재 PR diff에 관련한 active 엔트리 주입(retriever 역할 이동) — **DoD: 빈 저장소면 spec layer만으로 리뷰, 주입 0건 기록**
-- [ ] 3.5 주입된 엔트리 id를 run audit에 기록
-- [ ] 3.6 `knowledge/` 단독 CLI (distill / curate / list)
+- [x] 3.1 암묵지 저장소 모듈(`knowledge/store.py` + `knowledge_entries` 테이블) — spec과 분리, 평문 login 미저장(provenance는 comment id)
+- [x] 3.2 `comment_outcomes` good-cases-only(시니어+addressed+merged)에서 후보 distill 로직 — `db.fetch_addressed_senior_comments` 재사용, 멱등
+- [x] 3.3 사람 큐레이션 게이트: 후보→active 확정/거부, active만 주입 대상, 거부는 재제안 안 됨
+- [x] 3.4 현재 PR diff에 관련한 active 엔트리 주입(`knowledge/inject.py`) — **DoD 충족: 빈 저장소→[] (spec layer만)**. 유사도는 MVP 토큰오버랩(임베딩은 향후)
+- [ ] 3.5 주입된 엔트리 id를 run audit에 기록 _(audit는 `knowledge_ids` 지원함; 실제 wiring은 4.1 runner)_
+- [x] 3.6 `knowledge/` 단독 CLI (distill / confirm / reject / list)
 
 ## 4. 트리아지 라우터 + 게시 (approve 미동작 — Stage 1)
 
