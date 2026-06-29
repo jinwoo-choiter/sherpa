@@ -91,6 +91,7 @@ def _cfg(tmp_path: Path) -> Config:
         ollama_base_url="http://127.0.0.1:11434",
         llm_model="x",
         embedding_model="y",
+        review_agent="claude",
     )
 
 

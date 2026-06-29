@@ -29,6 +29,7 @@ class Config:
     ollama_base_url: str
     llm_model: str
     embedding_model: str
+    review_agent: str  # default CLI agent name; per-run --agent overrides it
 
 
 def load() -> Config:
@@ -70,6 +71,7 @@ def load() -> Config:
         llm_model=os.environ.get("SHERPA_LLM_MODEL", "qwen2.5-coder:32b-instruct-q4_K_M"),
         # TODO(operator): compare 2-3 embedding candidates and revisit (tasks.md 5.1).
         embedding_model=os.environ.get("SHERPA_EMBED_MODEL", "nomic-embed-text"),
+        review_agent=os.environ.get("SHERPA_REVIEW_AGENT", "claude"),
     )
 
 
