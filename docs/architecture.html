@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sherpa — Architecture</title>
+<style>
+  :root{
+    --bg:#0f1115; --card:#171a21; --card2:#1d2129; --border:#2a2f3a;
+    --text:#e6e9ef; --muted:#9aa3b2; --faint:#6b7280;
+    --green:#3fb950; --amber:#d29922; --blue:#58a6ff; --slate:#8b949e;
+    --purple:#bc8cff; --red:#f85149;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,
+      "Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+    line-height:1.5; padding:32px 20px 80px;
+  }
+  .wrap{max-width:1180px;margin:0 auto}
+  h1{font-size:30px;margin:0 0 6px;letter-spacing:-.02em}
+  .def{color:var(--muted);font-size:15px;max-width:880px;margin:0 0 14px}
+  .meta{font-size:12px;color:var(--faint);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.12em;color:var(--blue);
+     margin:42px 0 16px;border-bottom:1px solid var(--border);padding-bottom:8px}
+  section{margin-top:8px}
+  .cap{color:var(--muted);font-size:13px;margin-top:10px}
+
+  /* chips */
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 4px}
+  .chip{font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--border);
+        background:var(--card);color:var(--muted)}
+  .chip b{color:var(--text);font-weight:600}
+
+  /* legend / status */
+  .legend{display:flex;flex-wrap:wrap;gap:16px;margin:14px 0}
+  .lg{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted)}
+  .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
+  .d-done{background:var(--green)} .d-prog{background:var(--amber)}
+  .d-plan{background:var(--blue)}  .d-reuse{background:var(--slate)}
+
+  /* generic box */
+  .box{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+  .box .t{font-weight:600;font-size:14px}
+  .box .s{font-size:12px;color:var(--muted);margin-top:3px}
+
+  /* pipeline */
+  .pipe{display:flex;align-items:stretch;flex-wrap:wrap;gap:10px}
+  .stage{flex:1 1 150px;min-width:140px;background:var(--card);border:1px solid var(--border);
+         border-radius:10px;padding:12px;position:relative}
+  .stage .t{font-weight:600;font-size:13.5px}
+  .stage .s{font-size:11.5px;color:var(--muted);margin-top:4px}
+  .arrow{align-self:center;color:var(--faint);font-size:22px;flex:0 0 auto;padding:0 2px}
+  .tag{display:inline-block;font-size:10px;padding:1px 7px;border-radius:999px;margin-top:8px;
+       font-weight:600;letter-spacing:.02em}
+  .t-done{background:rgba(63,185,80,.15);color:var(--green);border:1px solid rgba(63,185,80,.35)}
+  .t-prog{background:rgba(210,153,34,.15);color:var(--amber);border:1px solid rgba(210,153,34,.35)}
+  .t-plan{background:rgba(88,166,255,.13);color:var(--blue);border:1px solid rgba(88,166,255,.32)}
+  .t-reuse{background:rgba(139,148,158,.15);color:var(--slate);border:1px solid rgba(139,148,158,.32)}
+  .left-accent{border-left:3px solid var(--purple)}
+
+  /* fan (triage outcomes) */
+  .fan{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+  @media(max-width:720px){.fan{grid-template-columns:1fr}}
+
+  /* component grid */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+  .comp{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px 14px}
+  .comp .h{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .comp .name{font-family:ui-monospace,Menlo,monospace;font-size:13px;font-weight:600}
+  .comp .role{font-size:10.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em}
+  .comp .s{font-size:12px;color:var(--muted);margin-top:6px}
+
+  /* rollout */
+  .roll{display:flex;gap:10px;flex-wrap:wrap}
+  .step{flex:1 1 240px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px}
+  .step .n{font-size:11px;color:var(--faint);letter-spacing:.1em;text-transform:uppercase}
+  .step .t{font-weight:600;margin:4px 0 6px}
+  .step ul{margin:6px 0 0;padding-left:18px;font-size:12px;color:var(--muted)}
+  .step li{margin:2px 0}
+
+  .note{background:var(--card2);border:1px solid var(--border);border-radius:10px;
+        padding:12px 14px;font-size:12.5px;color:var(--muted);margin-top:14px}
+  .note b{color:var(--text)}
+  code{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#c9d1e6;
+       background:rgba(255,255,255,.04);padding:1px 5px;border-radius:5px}
+  .kgline{display:flex;align-items:center;gap:8px;color:var(--purple);font-size:12px;margin:12px 0 2px}
+  .kgline .ln{flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--purple),transparent);opacity:.5}
+  footer{margin-top:50px;color:var(--faint);font-size:11.5px;text-align:center;
+         font-family:ui-monospace,Menlo,monospace}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Sherpa — Architecture</h1>
+  <p class="def">모든 PR에 “리뷰어 지도”를 먼저 띄워 누구나 복잡한 코드 리뷰를 시작할 수 있게 돕고(분배),
+  그 리뷰에 대한 시니어 판단을 포착해 팀 암묵지로 축적하며(수렴), 궁극적으로 대상 레포의 OpenSpec
+  spec·convention 갱신을 제안하는 — 사람이 항상 승인 게이트를 쥔, 선택 가능한 CLI 에이전트 기반 지식 시스템.</p>
+  <p class="meta">source of truth: openspec/changes/generalize-review-agents · status: Stage 1 in progress (groups 1–3 core)</p>
+
+  <div class="chips">
+    <span class="chip"><b>never-approve</b> — 모델은 approve 안 함, 규칙이 함</span>
+    <span class="chip"><b>ingest-time anonymization</b></span>
+    <span class="chip"><b>good-cases-only</b> 학습 코퍼스</span>
+    <span class="chip"><b>sandboxed</b> 읽기전용 에이전트</span>
+    <span class="chip"><b>trajectory</b> 감사</span>
+    <span class="chip"><b>human approval gate</b></span>
+  </div>
+
+  <div class="legend">
+    <span class="lg"><i class="dot d-done"></i> 구현됨 (Stage 1)</span>
+    <span class="lg"><i class="dot d-prog"></i> 부분/진행중</span>
+    <span class="lg"><i class="dot d-plan"></i> 예정 (group 4 · Stage 2/3)</span>
+    <span class="lg"><i class="dot d-reuse"></i> 기존 재사용</span>
+  </div>
+
+  <!-- ───────── Flywheel ───────── -->
+  <h2>3-Phase Knowledge Flywheel</h2>
+  <section>
+    <svg viewBox="0 0 760 240" width="100%" style="max-width:760px;display:block;margin:0 auto">
+      <defs>
+        <marker id="ah" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6 Z" fill="#6b7280"/>
+        </marker>
+      </defs>
+      <!-- nodes -->
+      <g font-family="-apple-system,Noto Sans KR,sans-serif">
+        <rect x="40" y="80" width="190" height="80" rx="12" fill="#171a21" stroke="#3fb950"/>
+        <text x="135" y="108" fill="#e6e9ef" font-size="14" font-weight="600" text-anchor="middle">Phase 1 · 분배</text>
+        <text x="135" y="128" fill="#9aa3b2" font-size="11.5" text-anchor="middle">리뷰어 온램프</text>
+        <text x="135" y="144" fill="#9aa3b2" font-size="11.5" text-anchor="middle">(리뷰어 지도)</text>
+
+        <rect x="285" y="20" width="190" height="80" rx="12" fill="#171a21" stroke="#d29922"/>
+        <text x="380" y="48" fill="#e6e9ef" font-size="14" font-weight="600" text-anchor="middle">Phase 2 · 수렴</text>
+        <text x="380" y="68" fill="#9aa3b2" font-size="11.5" text-anchor="middle">암묵지 포착</text>
+        <text x="380" y="84" fill="#9aa3b2" font-size="11.5" text-anchor="middle">(outcomes→distill)</text>
+
+        <rect x="530" y="80" width="190" height="80" rx="12" fill="#171a21" stroke="#58a6ff"/>
+        <text x="625" y="108" fill="#e6e9ef" font-size="14" font-weight="600" text-anchor="middle">Phase 3 · 보상</text>
+        <text x="625" y="128" fill="#9aa3b2" font-size="11.5" text-anchor="middle">spec/convention 제안</text>
+        <text x="625" y="144" fill="#6b7280" font-size="11" text-anchor="middle">(future)</text>
+      </g>
+      <!-- cycle arrows -->
+      <path d="M210,95 C250,55 290,50 320,70" fill="none" stroke="#6b7280" stroke-width="1.6" marker-end="url(#ah)"/>
+      <path d="M455,70 C500,50 540,60 575,90" fill="none" stroke="#6b7280" stroke-width="1.6" marker-end="url(#ah)"/>
+      <path d="M560,150 C420,215 330,215 200,155" fill="none" stroke="#6b7280" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#ah)"/>
+    </svg>
+    <p class="cap">같은 리뷰 행위가 지식의 <b>분배</b>(아래로 뿌림)와 <b>수렴</b>(위로 모음)이 만나는 지점.
+    Phase 1 품질이 Phase 2 플라이휠의 점화 플러그다. Phase 3(점선)는 향후 단계.</p>
+  </section>
+
+  <!-- ───────── Review pipeline ───────── -->
+  <h2>Review Pipeline · event-driven (Stage 1 → 3)</h2>
+  <section>
+    <div class="pipe">
+      <div class="stage">
+        <div class="t">PR hook</div>
+        <div class="s">open / sync / reopen</div>
+        <span class="tag t-plan">group 4/7</span>
+      </div>
+      <div class="arrow">▶</div>
+      <div class="stage left-accent">
+        <div class="t">ReviewAgent</div>
+        <div class="s">pluggable · sandboxed 읽기전용 · repo 직접 탐색</div>
+        <span class="tag t-done">done · 1.x/2.1</span>
+      </div>
+      <div class="arrow">▶</div>
+      <div class="stage">
+        <div class="t">ReviewResult</div>
+        <div class="s">요약 · inline findings · category evidence</div>
+        <span class="tag t-done">done · schema</span>
+      </div>
+      <div class="arrow">▶</div>
+      <div class="stage">
+        <div class="t">Triage Router</div>
+        <div class="s">영향도에 따라 분기</div>
+        <span class="tag t-plan">group 4</span>
+      </div>
+    </div>
+
+    <div class="fan">
+      <div class="box">
+        <div class="t">① Whitelist Gate → binding approve</div>
+        <div class="s">결정적 룰(코드) · fail-closed · 에이전트 <b>밖</b> · 운영자 소유 화이트리스트.
+        모델은 approve 안 함.</div>
+        <span class="tag t-plan">Stage 2→3</span>
+      </div>
+      <div class="box">
+        <div class="t">② Inline findings</div>
+        <div class="s">변경 필요 라인에 PR review-comment 게시(<code>pulls/{n}/comments</code>) — approve 아님</div>
+        <span class="tag t-plan">group 4</span>
+      </div>
+      <div class="box">
+        <div class="t">③ Reviewer summary + focus</div>
+        <div class="s">사람 판단 필요 시 요약 + “여기 집중” 인라인</div>
+        <span class="tag t-plan">group 4</span>
+      </div>
+    </div>
+
+    <div class="pipe" style="margin-top:10px">
+      <div class="stage" style="flex:0 0 auto">
+        <div class="t">bot/poster</div>
+        <div class="s">멱등 게시 · <code>[pre-flight]</code> 마커</div>
+        <span class="tag t-reuse">reused → ext.</span>
+      </div>
+      <div class="arrow">＋</div>
+      <div class="stage" style="flex:0 0 auto">
+        <div class="t">Trajectory audit</div>
+        <div class="s">agent/model · files read · 원본 transcript ref</div>
+        <span class="tag t-done">done · 2.3</span>
+      </div>
+    </div>
+
+    <div class="kgline"><span>knowledge 주입 (관련 active 엔트리)</span><span class="ln"></span></div>
+    <p class="cap">↑ 위 <b>ReviewAgent</b> 단계에 팀 암묵지가 주입된다(코드에서 못 읽는 판단 레이어). 빈 저장소면 spec layer만으로 진행.</p>
+  </section>
+
+  <!-- ───────── Learning loop ───────── -->
+  <h2>Learning Loop · batch (Phase 2)</h2>
+  <section>
+    <div class="pipe">
+      <div class="stage"><div class="t">ingester</div><div class="s">GitHub 폴링</div><span class="tag t-reuse">reused</span></div>
+      <div class="arrow">▶</div>
+      <div class="stage"><div class="t">DB (SQLite)</div><div class="s">익명화 저장 (author_hash)</div><span class="tag t-reuse">reused</span></div>
+      <div class="arrow">▶</div>
+      <div class="stage"><div class="t">outcomes</div><div class="s">4종 resolution_type</div><span class="tag t-reuse">reused</span></div>
+      <div class="arrow">▶</div>
+      <div class="stage"><div class="t">distill</div><div class="s">good-cases-only → 후보(멱등)</div><span class="tag t-done">done · 3.2</span></div>
+      <div class="arrow">▶</div>
+      <div class="stage"><div class="t">human curation</div><div class="s">candidate→active/reject</div><span class="tag t-done">done · 3.3</span></div>
+      <div class="arrow">▶</div>
+      <div class="stage left-accent"><div class="t">knowledge store</div><div class="s">active만 주입 대상</div><span class="tag t-done">done · 3.1/3.4</span></div>
+    </div>
+    <p class="cap">active 엔트리는 리뷰 시 <b>관련성(MVP: 토큰 오버랩)</b>으로 선별돼 주입되고, 주입 id는 audit에 기록(3.5 wiring 예정).</p>
+  </section>
+
+  <!-- ───────── Agent abstraction zoom ───────── -->
+  <h2>Agent Abstraction (zoom)</h2>
+  <section>
+    <div class="pipe">
+      <div class="stage" style="flex:0 0 200px">
+        <div class="t">ReviewTask</div>
+        <div class="s">repo_path · changed_files · form_spec · injected_knowledge</div>
+        <span class="tag t-done">done</span>
+      </div>
+      <div class="arrow">▶</div>
+      <div class="stage left-accent" style="flex:0 0 240px">
+        <div class="t">ReviewAgent (registry)</div>
+        <div class="s"><code>resolve(default, override)</code> → claude · codex · ollama(legacy)</div>
+        <span class="tag t-done">done · 1.3–1.7</span>
+      </div>
+      <div class="arrow">▶</div>
+      <div class="stage" style="flex:0 0 220px">
+        <div class="t">(ReviewResult, Trajectory)</div>
+        <div class="s">우리 스키마로 coax + 파싱 · 어댑터별 정규화</div>
+        <span class="tag t-done">done</span>
+      </div>
+    </div>
+    <p class="cap"><b>게이트는 에이전트 밖.</b> 에이전트는 findings + evidence만 반환하고, binding approve는 결정적 룰이 계산 →
+    PR 내용발 프롬프트 인젝션이 에이전트를 jailbreak해도 자동 머지 불가(보안 구조).</p>
+  </section>
+
+  <!-- ───────── Component map ───────── -->
+  <h2>Component Map</h2>
+  <section>
+    <div class="grid">
+      <div class="comp"><div class="h"><span class="name">agent/</span><span class="role">new</span></div>
+        <div class="s">ReviewAgent 계약 · sandbox 정책 · claude/codex/ollama 어댑터 · 선택</div>
+        <span class="tag t-done">Stage 1 done</span></div>
+      <div class="comp"><div class="h"><span class="name">knowledge/</span><span class="role">new</span></div>
+        <div class="s">store(distill·curate) · inject(relevance·render) · CLI</div>
+        <span class="tag t-done">Stage 1 done</span></div>
+      <div class="comp"><div class="h"><span class="name">inference/</span><span class="role">promoted</span></div>
+        <div class="s">audit→trajectory 확장 완료. runner는 ReviewAgent로 재작성 예정</div>
+        <span class="tag t-prog">part · 2.3 / 4.1</span></div>
+      <div class="comp"><div class="h"><span class="name">bot/</span><span class="role">reused→ext.</span></div>
+        <div class="s">멱등 issue 코멘트. 인라인 게시 + (Stage 3) 게이트 approve 추가 예정</div>
+        <span class="tag t-plan">group 4/6</span></div>
+      <div class="comp"><div class="h"><span class="name">outcomes/</span><span class="role">promoted</span></div>
+        <div class="s">resolution_type 휴리스틱 — Phase 2 distill의 신호원</div>
+        <span class="tag t-reuse">reused</span></div>
+      <div class="comp"><div class="h"><span class="name">db/</span><span class="role">reused→ext.</span></div>
+        <div class="s">단일 SQL surface. knowledge_entries 테이블 추가</div>
+        <span class="tag t-done">ext. done</span></div>
+      <div class="comp"><div class="h"><span class="name">ingester/</span><span class="role">reused</span></div>
+        <div class="s">GitHub 폴링 → 익명화 적재 (학습 코퍼스 트랙)</div>
+        <span class="tag t-reuse">reused</span></div>
+      <div class="comp"><div class="h"><span class="name">rag/</span><span class="role">role-shift</span></div>
+        <div class="s">"약한 모델 보완" → 암묵지 주입으로 역할 이동(legacy retriever)</div>
+        <span class="tag t-reuse">reused</span></div>
+      <div class="comp"><div class="h"><span class="name">anon.py</span><span class="role">reused</span></div>
+        <div class="s">author_hash — 평문 login 미저장 (knowledge에도 적용)</div>
+        <span class="tag t-reuse">reused</span></div>
+    </div>
+  </section>
+
+  <!-- ───────── Rollout ───────── -->
+  <h2>Staged Rollout</h2>
+  <section>
+    <div class="roll">
+      <div class="step" style="border-color:rgba(63,185,80,.4)">
+        <div class="n">Stage 1 · in progress</div>
+        <div class="t">Agentic 리뷰 + 트리아지 (approve 미동작)</div>
+        <ul>
+          <li>✅ 에이전트 추상화 + 샌드박스 + trajectory</li>
+          <li>✅ 암묵지 포착(distill·curate·inject)</li>
+          <li>⬜ 트리아지 라우터 · 인라인 게시 · runner 재작성 (group 4)</li>
+        </ul>
+      </div>
+      <div class="step">
+        <div class="n">Stage 2 · planned</div>
+        <div class="t">결정적 화이트리스트 게이트 (shadow/advisory)</div>
+        <ul>
+          <li>⬜ 화이트리스트 분류 (docs/생성/포맷-only)</li>
+          <li>⬜ fail-closed · 게이트 자체수정 차단</li>
+          <li>⬜ shadow 판정 기록 → revert 기준선 측정</li>
+        </ul>
+      </div>
+      <div class="step">
+        <div class="n">Stage 3 · planned</div>
+        <div class="t">binding approve + 안전통제</div>
+        <ul>
+          <li>⬜ 게이트 승인 시 봇 approve (게이트 통과 시에만)</li>
+          <li>⬜ test_no_approve 교체(불변식 강화) · kill-switch</li>
+          <li>⬜ auto-approve revert율 지표 · 봇 CODEOWNER 등록</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <div class="note">
+    <b>핵심 불변식</b> — ① 모델은 approve하지 않는다(결정적 게이트만). ② 게이트는 에이전트 밖, fail-closed,
+    화이트리스트는 운영자 소유(PR 손 밖). ③ 에이전트는 샌드박스 읽기전용(PR 내용 신뢰 불가).
+    ④ 작성자 식별자는 익명 해시로만 저장. ⑤ 모든 런은 trajectory로 감사 가능.
+  </div>
+
+  <footer>generated for sherpa · reflects openspec/changes/generalize-review-agents (proposal+design) and Stage 1 implementation state</footer>
+
+</div>
+</body>
+</html>
